@@ -8,7 +8,7 @@ console.log("🛠️ Simulateur GPS démarré. En attente du signal...");
 // Données démultiplication Peugeot 206 1.4i (TU3JP BVA AL4)
 const TIRE_CIRCUMFERENCE = 1.83; 
 const FINAL_DRIVE = 4.28; 
-const GEAR_RATIOS = [3.417, 1.949, 1.357, 1.054]; // BVA 4 Rapports
+const GEAR_RATIOS = [3.417, 1.949, 1.357, 1.054, 0.854]; // BVM 5 Rapports
 
 let currentGear = 0; // 1ère vitesse par défaut
 
@@ -23,7 +23,7 @@ function calculateRpmFromSpeed(speedKmh) {
 
     // Logique de "passage de vitesse automatique" virtuelle pour la simulation
     // On passe le rapport supérieur à 3500 RPM
-    if (rpm > 2200 && currentGear < 3) {
+    if (rpm > 2200 && currentGear < 4) {
         currentGear++;
         rpm = speedMps * (60 / TIRE_CIRCUMFERENCE) * GEAR_RATIOS[currentGear] * FINAL_DRIVE;
     } 
