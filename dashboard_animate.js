@@ -23,12 +23,12 @@ function calculateRpmFromSpeed(speedKmh) {
 
     // Logique de "passage de vitesse automatique" virtuelle pour la simulation
     // On passe le rapport supérieur à 3500 RPM
-    if (rpm > 3500 && currentGear < 3) {
+    if (rpm > 2200 && currentGear < 3) {
         currentGear++;
         rpm = speedMps * (60 / TIRE_CIRCUMFERENCE) * GEAR_RATIOS[currentGear] * FINAL_DRIVE;
     } 
     // On repasse le rapport inférieur à 1600 RPM
-    else if (rpm < 1600 && currentGear > 0) {
+    else if (rpm < 1700 && currentGear > 0) {
         currentGear--;
         rpm = speedMps * (60 / TIRE_CIRCUMFERENCE) * GEAR_RATIOS[currentGear] * FINAL_DRIVE;
     }
