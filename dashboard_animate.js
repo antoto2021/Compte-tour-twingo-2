@@ -3,32 +3,33 @@
 // Source temporaire pour l'Étape 0 (GitHub Pages)
 // ==========================================
 
-console.log("🛠️ Simulateur GPS démarré. En attente du signal...");
+console.log("🛠️ Simulateur GPS démarré avec les ratios exacts de la boîte MA5.");
 
-// Données démultiplication Peugeot 206 1.4i (TU3JP BVA AL4)
-const TIRE_CIRCUMFERENCE = 1.83; 
-const FINAL_DRIVE = 4.28; 
-const GEAR_RATIOS = [3.417, 1.949, 1.357, 1.054, 0.854]; // BVM 5 Rapports
+// Données démultiplication exactes de la Peugeot 206
+const TIRE_CIRCUMFERENCE = 1.757; // Calculé mathématiquement d'après vos données
+const FINAL_DRIVE = 4.06; // Votre rapport de pont
+const GEAR_RATIOS = [3.42, 1.81, 1.28, 0.98, 0.77]; // Vos 5 rapports de boîte
 
-let currentGear = 0; // 1ère vitesse par défaut
+let currentGear = 0; // 1ère vitesse par défaut (Index 0)
+let lastSpeedMps = 0;
 
-// Calcule les RPM théoriques basés sur la transmission de la 206
+// Calcule les RPM théoriques basés sur la transmission exacte
 function calculateRpmFromSpeed(speedKmh) {
     if (speedKmh < 3) return 850; // Ralenti moteur
 
     let speedMps = speedKmh / 3.6;
     
-    // Calcul de base
+    // Calcul de base pour le rapport actuellement engagé
     let rpm = speedMps * (60 / TIRE_CIRCUMFERENCE) * GEAR_RATIOS[currentGear] * FINAL_DRIVE;
 
-    // Logique de "passage de vitesse automatique" virtuelle pour la simulation
-    // On passe le rapport supérieur à 3500 RPM
+    // Logique de "passage de vitesse" virtuelle pour simuler la conduite
+    // On passe le rapport supérieur à 3000 RPM (jusqu'à la 5ème vitesse)
     if (rpm > 2200 && currentGear < 4) {
         currentGear++;
         rpm = speedMps * (60 / TIRE_CIRCUMFERENCE) * GEAR_RATIOS[currentGear] * FINAL_DRIVE;
     } 
-    // On repasse le rapport inférieur à 1600 RPM
-    else if (rpm < 1700 && currentGear > 0) {
+    // On repasse le rapport inférieur sous 1400 RPM
+    else if (rpm < 1600 && currentGear > 0) {
         currentGear--;
         rpm = speedMps * (60 / TIRE_CIRCUMFERENCE) * GEAR_RATIOS[currentGear] * FINAL_DRIVE;
     }
@@ -36,9 +37,8 @@ function calculateRpmFromSpeed(speedKmh) {
     return Math.round(rpm);
 }
 
-// Vérifie si le GPS du navigateur (tablette Android / Smartphone) est actif
+// Vérifie si le GPS du navigateur est actif
 if ("geolocation" in navigator) {
-    // navigator.geolocation.watchPosition interroge la puce GPS en boucle
     navigator.geolocation.watchPosition(
         (position) => {
             // 1. Vitesse (m/s) convertie en km/h
@@ -46,42 +46,59 @@ if ("geolocation" in navigator) {
             let speedKmh = Math.round(speedMps * 3.6);
             let altitude = position.coords.altitude ? Math.round(position.coords.altitude) : 145;
 
-            // 2. RPM (Devinés dynamiquement)
+            // 2. RPM calculés avec votre vraie boîte
             let rpm = calculateRpmFromSpeed(speedKmh);
 
-            // 3. Simulation "Tricherie" (Charge et Papillon basés sur la vitesse)
-            let engineLoad = Math.min(25 + (speedKmh * 0.7), 90);
-            let throttle = Math.min(10 + (speedKmh * 0.8), 100);
-            if(speedKmh < 3) { engineLoad = 25; throttle = 0; }
+            // 3. Simulation de Charge et Papillon
+            let acceleration = speedMps - lastSpeedMps; 
+            lastSpeedMps = speedMps;
+
+            let engineLoad = 25; 
+            let throttle = 15; 
+            
+            if (acceleration > 0.5) { 
+                engineLoad = 85; throttle = 70; // Accélération
+            } else if (acceleration < -0.5) {
+                engineLoad = 5; throttle = 0; // Freinage
+            } else if (speedKmh < 3) {
+                engineLoad = 30; throttle = 5; // Ralenti
+            }
 
             // ==========================================
             // INJECTION DES DONNÉES DANS script.js
             // ==========================================
-            // Nous construisons le colis de données EXACT que le Pi enverra.
             const mockPayload = {
                 obd: {
                     speed: speedKmh,
                     rpm: rpm,
-                    coolant_temp: 88, // Fictif, le moteur est chaud
+                    coolant_temp: 88, 
                     engine_load: engineLoad,
                     throttle_pos: throttle,
-                    intake_temp: 35
+                    intake_temp: 35,
+                    map: (engineLoad > 50) ? 95 : 30, // Pression simulée
+                    timing_advance: 15, // Avance simulée
+                    lambda_volt: (Math.random() * (0.8 - 0.2) + 0.2).toFixed(2), // Oscillation de la sonde Lambda
+                    fuel_status: "Closed loop",
+                    stft: (Math.random() * 4 - 2).toFixed(1), // Variation STFT +/- 2%
+                    ltft: 1.5
                 },
                 sensors: {
                     cabin_temp: 21.5,
+                    ext_temp: 14,
                     pm25: 12,
-                    altitude: altitude
+                    altitude: altitude,
+                    g_force_accel: (acceleration / 9.81).toFixed(2) // Simulation des G
                 }
             };
 
-            // Le simulateur n'affiche ses données QUE si le vrai OBD est déconnecté
+            // Envoi des données si le vrai OBD n'est pas connecté
             if (typeof window.updateDashboardUI === 'function' && !window.isObdConnected) {
                 window.updateDashboardUI(mockPayload);
             }
         }, 
         (error) => { console.warn("Erreur GPS: ", error.message); }, 
         {
-            enableHighAccuracy: true, // Force l'utilisation du GPS précis
+            enableHighAccuracy: true,
             maximumAge: 0,
             timeout: 5000
         }
